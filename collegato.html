@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banana Split · Google Drive</title>
+<link rel="stylesheet" href="stile.css">
+<style>body{text-align:center;padding-top:18vh}p{max-width:340px;margin:12px auto}</style>
+</head>
+<body>
+<div class="banana" id="icona">🍌</div>
+<h1 id="titolo">Google Drive</h1>
+<p id="testo" class="tenue"></p>
+<p class="tenue">Puoi chiudere questa pagina e tornare a Banana Split.</p>
+<script>
+  const q = new URLSearchParams(location.search)
+  document.getElementById('titolo').textContent = q.get('titolo') || 'Google Drive'
+  document.getElementById('testo').textContent = q.get('testo') || ''
+  if (q.get('esito') === 'ok') document.getElementById('icona').textContent = '✅'
+  else if (q.get('esito') === 'errore') document.getElementById('icona').textContent = '⚠️'
+</script>
+</body>
+</html>
