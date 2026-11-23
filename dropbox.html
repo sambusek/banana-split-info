@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Banana Split · Collega Dropbox</title>
+<link rel="stylesheet" href="stile.css">
+<style>
+  input, textarea, button { font: inherit; width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 14px; border-radius: 8px; border: 1px solid #9994; background: transparent; color: inherit; }
+  button { background: var(--accento); color: #1d1b16; border: 0; font-weight: 600; }
+  textarea { height: 7em; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+  .passo { margin-top: 24px; }
+  #errore { color: #c0392b; }
+</style>
+</head>
+<body>
+<div class="banana">🍌</div>
+<h1>Collega Dropbox</h1>
+<p class="tenue">Serve una volta sola, per permettere alla build di Banana Split di salvare le copie di sicurezza nella cartella dell'app su Dropbox. Tutto avviene in questa pagina: nulla viene inviato altrove.</p>
+
+<div class="passo">
+  <h2>1. App key</h2>
+  <p>Incolla l'<b>App key</b> dell'app creata su Dropbox (pagina Settings dell'app).</p>
+  <input id="chiave" autocomplete="off" spellcheck="false" placeholder="App key">
+  <button id="apri">Apri Dropbox e consenti l'accesso</button>
+</div>
+
+<div class="passo">
+  <h2>2. Codice</h2>
+  <p>Dropbox mostra un codice: copialo e incollalo qui.</p>
+  <input id="codice" autocomplete="off" spellcheck="false" placeholder="Codice di accesso">
+  <button id="ottieni">Ottieni il token</button>
+  <p id="errore"></p>
+</div>
+
+<div class="passo" id="risultato" hidden>
+  <h2>3. Token</h2>
+  <p>Copia il token e incollalo su GitHub nel segreto <b>DROPBOX_REFRESH_TOKEN</b>. Non mandarlo in chat e non farne screenshot.</p>
+  <textarea id="token" readonly></textarea>
+  <button id="copia">Copia il token</button>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id)
+  const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+  $('apri').onclick = async () => {
+    const chiave = $('chiave').value.trim()
+    if (!chiave) { $('errore').textContent = 'Manca la App key.'; return }
+    const verifica = b64url(crypto.getRandomValues(new Uint8Array(48)))
+    sessionStorage.setItem('dbx-verifica', verifica)
+    sessionStorage.setItem('dbx-chiave', chiave)
+    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifica)))
+    const url = new URL('https://www.dropbox.com/oauth2/authorize')
+    url.search = new URLSearchParams({
+      client_id: chiave, response_type: 'code', token_access_type: 'offline',
+      code_challenge: b64url(hash), code_challenge_method: 'S256',
+    })
+    window.open(url, '_blank')
+  }
+
+  $('ottieni').onclick = async () => {
+    $('errore').textContent = ''
+    const chiave = sessionStorage.getItem('dbx-chiave'), verifica = sessionStorage.getItem('dbx-verifica')
+    if (!chiave || !verifica) { $('errore').textContent = 'Prima premi "Apri Dropbox" in questa stessa pagina.'; return }
+    try {
+      const r = await fetch('https://api.dropboxapi.com/oauth2/token', {
+        method: 'POST',
+        body: new URLSearchParams({ code: $('codice').value.trim(), grant_type: 'authorization_code', client_id: chiave, code_verifier: verifica }),
+      })
+      const dati = await r.json()
+      if (!r.ok || !dati.refresh_token) throw new Error(dati.error_description || dati.error || 'risposta senza token')
+      $('token').value = dati.refresh_token
+      $('risultato').hidden = false
+      sessionStorage.removeItem('dbx-verifica')
+    } catch (e) {
+      $('errore').textContent = 'Non riuscito: ' + e.message + '. Il codice vale pochi minuti e una volta sola: ripeti dal passo 1.'
+    }
+  }
+
+  $('copia').onclick = async () => {
+    await navigator.clipboard.writeText($('token').value)
+    $('copia').textContent = 'Copiato ✓'
+  }
+</script>
+</body>
+</html>
